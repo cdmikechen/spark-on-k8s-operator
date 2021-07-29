@@ -5,7 +5,7 @@
 
 ## Community
 
-* Join our [Slack](https://kubernetes.slack.com/messages/CALBDHMTL) channel.
+* Join our [Slack](https://kubernetes.slack.com/messages/CALBDHMTL) channel on [Kubernetes on Slack](https://slack.k8s.io/).
 * Check out [who is using the Kubernetes Operator for Apache Spark](docs/who-is-using.md).
 
 ## Project Status
@@ -47,6 +47,7 @@ The following table lists the most recent few versions of the operator.
 | Operator Version | API Version | Kubernetes Version | Base Spark Version | Operator Image Tag |
 | ------------- | ------------- | ------------- | ------------- | ------------- |
 | `latest` (master HEAD) | `v1beta2` | 1.13+ | `3.0.0` | `latest` |
+| `v1beta2-1.2.3-3.1.1` | `v1beta2` | 1.13+ | `3.1.1` | `v1beta2-1.2.3-3.1.1` |
 | `v1beta2-1.2.0-3.0.0` | `v1beta2` | 1.13+ | `3.0.0` | `v1beta2-1.2.0-3.0.0` |
 | `v1beta2-1.1.2-2.4.5` | `v1beta2` | 1.13+ | `2.4.5` | `v1beta2-1.1.2-2.4.5` |
 | `v1beta2-1.0.1-2.4.4` | `v1beta2` | 1.13+ | `2.4.4` | `v1beta2-1.0.1-2.4.4` |
@@ -80,7 +81,7 @@ The Kubernetes Operator for Apache Spark currently supports the following list o
 * Automatically runs `spark-submit` on behalf of users for each `SparkApplication` eligible for submission.
 * Provides native [cron](https://en.wikipedia.org/wiki/Cron) support for running scheduled applications.
 * Supports customization of Spark pods beyond what Spark natively is able to do through the mutating admission webhook, e.g., mounting ConfigMaps and volumes, and setting pod affinity/anti-affinity.
-* Supports automatic application re-submission for updated `SparkAppliation` objects with updated specification.
+* Supports automatic application re-submission for updated `SparkApplication` objects with updated specification.
 * Supports automatic application restart with a configurable restart policy.
 * Supports automatic retries of failed submissions with optional linear back-off.
 * Supports mounting local Hadoop configuration as a Kubernetes ConfigMap automatically via `sparkctl`.

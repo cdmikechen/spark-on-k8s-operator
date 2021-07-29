@@ -565,7 +565,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>TimeToLiveSeconds defines the Time-To-Live (TTL) duration in seconds for this SparkAplication
+<p>TimeToLiveSeconds defines the Time-To-Live (TTL) duration in seconds for this SparkApplication
 after its termination.
 The SparkApplication object will be garbage collected if the current time is more than the
 TimeToLiveSeconds since its termination.</p>
@@ -611,7 +611,7 @@ DynamicAllocation
 <td>
 <em>(Optional)</em>
 <p>DynamicAllocation configures dynamic allocation that becomes available for the Kubernetes
-scheduleer backend since Spark 3.0.</p>
+scheduler backend since Spark 3.0.</p>
 </td>
 </tr>
 </table>
@@ -812,7 +812,7 @@ If specified, volcano scheduler will consider it as the resources requested.</p>
 <p>Packages is a list of maven coordinates of jars to include on the driver and executor
 classpaths. This will search the local maven repo, then maven central and any additional
 remote repositories given by the &ldquo;repositories&rdquo; option.
-Each papckage should be of the form &ldquo;groupId:artifactId:version&rdquo;.</p>
+Each package should be of the form &ldquo;groupId:artifactId:version&rdquo;.</p>
 </td>
 </tr>
 <tr>
@@ -1042,7 +1042,7 @@ map[string]string
 </td>
 <td>
 <em>(Optional)</em>
-<p>ServiceAnnotations defines the annoations to be added to the Kubernetes headless service used by
+<p>ServiceAnnotations defines the annotations to be added to the Kubernetes headless service used by
 executors to connect to the driver.</p>
 </td>
 </tr>
@@ -2306,7 +2306,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>TimeToLiveSeconds defines the Time-To-Live (TTL) duration in seconds for this SparkAplication
+<p>TimeToLiveSeconds defines the Time-To-Live (TTL) duration in seconds for this SparkApplication
 after its termination.
 The SparkApplication object will be garbage collected if the current time is more than the
 TimeToLiveSeconds since its termination.</p>
@@ -2352,7 +2352,7 @@ DynamicAllocation
 <td>
 <em>(Optional)</em>
 <p>DynamicAllocation configures dynamic allocation that becomes available for the Kubernetes
-scheduleer backend since Spark 3.0.</p>
+scheduler backend since Spark 3.0.</p>
 </td>
 </tr>
 </tbody>
@@ -2855,7 +2855,7 @@ int64
 </td>
 <td>
 <em>(Optional)</em>
-<p>Termination grace periond seconds for the pod</p>
+<p>Termination grace period seconds for the pod</p>
 </td>
 </tr>
 <tr>
@@ -2882,6 +2882,18 @@ string
 <td>
 <em>(Optional)</em>
 <p>HostAliases settings for the pod, following the Kubernetes specifications.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>shareProcessNamespace</code></br>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ShareProcessNamespace settings for the pod, following the Kubernetes specifications.</p>
 </td>
 </tr>
 </tbody>
@@ -2918,6 +2930,20 @@ TargetPort should be the same as the one defined in spark.ui.port</p>
 </tr>
 <tr>
 <td>
+<code>servicePortName</code></br>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServicePortName allows configuring the name of the service port.
+This may be useful for sidecar proxies like Envoy injected by Istio which require specific ports names to treat traffic as proper HTTP.
+Defaults to spark-driver-ui-port.</p>
+</td>
+</tr>
+<tr>
+<td>
 <code>serviceType</code></br>
 <em>
 <a href="https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.13/#servicetype-v1-core">
@@ -2928,6 +2954,18 @@ Kubernetes core/v1.ServiceType
 <td>
 <em>(Optional)</em>
 <p>ServiceType allows configuring the type of the service. Defaults to ClusterIP.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceAnnotations</code></br>
+<em>
+map[string]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>ServiceAnnotations is a map of key,value pairs of annotations that might be added to the service object.</p>
 </td>
 </tr>
 <tr>
@@ -2961,5 +2999,5 @@ map[string]string
 <hr/>
 <p><em>
 Generated with <code>gen-crd-api-reference-docs</code>
-on git commit <code>2f6a3f9</code>.
+on git commit <code>24a8842</code>.
 </em></p>

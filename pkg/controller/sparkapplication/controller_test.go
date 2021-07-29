@@ -67,7 +67,7 @@ func newFakeController(app *v1beta2.SparkApplication, pods ...*apiv1.Pod) (*Cont
 
 	podInformerFactory := informers.NewSharedInformerFactory(kubeClient, 0*time.Second)
 	controller := newSparkApplicationController(crdClient, kubeClient, informerFactory, podInformerFactory, recorder,
-		&util.MetricConfig{}, "", nil)
+		&util.MetricConfig{}, "", nil, true)
 
 	informer := informerFactory.Sparkoperator().V1beta2().SparkApplications().Informer()
 	if app != nil {
@@ -146,7 +146,7 @@ func TestOnUpdate(t *testing.T) {
 
 	ctrl.onUpdate(appTemplate, copyWithSpecUpdate)
 
-	// Verify that ppdate failed due to non-existance of SparkApplication.
+	// Verify that update failed due to non-existence of SparkApplication.
 	assert.Equal(t, 1, len(recorder.Events))
 	event := <-recorder.Events
 	assert.True(t, strings.Contains(event, "SparkApplicationSpecUpdateFailed"))
@@ -1230,6 +1230,17 @@ func TestSyncSparkApplication_ExecutingState(t *testing.T) {
 				},
 				Status: apiv1.PodStatus{
 					Phase: apiv1.PodFailed,
+					ContainerStatuses: []apiv1.ContainerStatus{
+						{
+							Name: config.SparkExecutorContainerName,
+							State: apiv1.ContainerState{
+								Terminated: &apiv1.ContainerStateTerminated{
+									ExitCode: 137,
+									Reason:   "OOMKilled",
+								},
+							},
+						},
+					},
 				},
 			},
 			expectedAppState:      v1beta2.FailingState,
@@ -1506,7 +1517,7 @@ func TestSyncSparkApplication_ApplicationExpired(t *testing.T) {
 	driverPodName := appName + "-driver"
 
 	now := time.Now()
-	terminatiomTime := now.Add(-2 * time.Second)
+	terminationTime := now.Add(-2 * time.Second)
 	app := &v1beta2.SparkApplication{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appName,
@@ -1527,7 +1538,7 @@ func TestSyncSparkApplication_ApplicationExpired(t *testing.T) {
 				PodName: driverPodName,
 			},
 			TerminationTime: metav1.Time{
-				Time: terminatiomTime,
+				Time: terminationTime,
 			},
 			ExecutorState: map[string]v1beta2.ExecutorState{"exec-1": v1beta2.ExecutorCompletedState},
 		},

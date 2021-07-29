@@ -77,6 +77,7 @@ type Controller struct {
 	podLister         v1.PodLister
 	ingressURLFormat  string
 	batchSchedulerMgr *batchscheduler.SchedulerManager
+	enableUIService   bool
 }
 
 // NewController creates a new Controller.
@@ -88,7 +89,8 @@ func NewController(
 	metricsConfig *util.MetricConfig,
 	namespace string,
 	ingressURLFormat string,
-	batchSchedulerMgr *batchscheduler.SchedulerManager) *Controller {
+	batchSchedulerMgr *batchscheduler.SchedulerManager,
+	enableUIService bool) *Controller {
 	crdscheme.AddToScheme(scheme.Scheme)
 
 	eventBroadcaster := record.NewBroadcaster()
@@ -98,7 +100,7 @@ func NewController(
 	})
 	recorder := eventBroadcaster.NewRecorder(scheme.Scheme, apiv1.EventSource{Component: "spark-operator"})
 
-	return newSparkApplicationController(crdClient, kubeClient, crdInformerFactory, podInformerFactory, recorder, metricsConfig, ingressURLFormat, batchSchedulerMgr)
+	return newSparkApplicationController(crdClient, kubeClient, crdInformerFactory, podInformerFactory, recorder, metricsConfig, ingressURLFormat, batchSchedulerMgr, enableUIService)
 }
 
 func newSparkApplicationController(
@@ -109,7 +111,8 @@ func newSparkApplicationController(
 	eventRecorder record.EventRecorder,
 	metricsConfig *util.MetricConfig,
 	ingressURLFormat string,
-	batchSchedulerMgr *batchscheduler.SchedulerManager) *Controller {
+	batchSchedulerMgr *batchscheduler.SchedulerManager,
+	enableUIService bool) *Controller {
 	queue := workqueue.NewNamedRateLimitingQueue(&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(queueTokenRefillRate), queueTokenBucketSize)},
 		"spark-application-controller")
 
@@ -120,6 +123,7 @@ func newSparkApplicationController(
 		queue:             queue,
 		ingressURLFormat:  ingressURLFormat,
 		batchSchedulerMgr: batchSchedulerMgr,
+		enableUIService:   enableUIService,
 	}
 
 	if metricsConfig != nil {
@@ -177,7 +181,7 @@ func (c *Controller) Stop() {
 // Callback function called when a new SparkApplication object gets created.
 func (c *Controller) onAdd(obj interface{}) {
 	app := obj.(*v1beta2.SparkApplication)
-	glog.Infof("SparkApplication %s/%s was added, enqueueing it for submission", app.Namespace, app.Name)
+	glog.Infof("SparkApplication %s/%s was added, enqueuing it for submission", app.Namespace, app.Name)
 	c.enqueue(app)
 }
 
@@ -216,7 +220,7 @@ func (c *Controller) onUpdate(oldObj, newObj interface{}) {
 			newApp.Name)
 	}
 
-	glog.V(2).Infof("SparkApplication %s/%s was updated, enqueueing it", newApp.Namespace, newApp.Name)
+	glog.V(2).Infof("SparkApplication %s/%s was updated, enqueuing it", newApp.Namespace, newApp.Name)
 	c.enqueue(newApp)
 }
 
@@ -370,7 +374,12 @@ func (c *Controller) getAndUpdateExecutorState(app *v1beta2.SparkApplication) er
 			oldState, exists := app.Status.ExecutorState[pod.Name]
 			// Only record an executor event if the executor state is new or it has changed.
 			if !exists || newState != oldState {
-				c.recordExecutorEvent(app, newState, pod.Name)
+				if newState == v1beta2.ExecutorFailedState {
+					execContainerState := getExecutorContainerTerminatedState(pod.Status)
+					c.recordExecutorEvent(app, newState, pod.Name, execContainerState.ExitCode, execContainerState.Reason)
+				} else {
+					c.recordExecutorEvent(app, newState, pod.Name)
+				}
 			}
 			executorStateMap[pod.Name] = newState
 
@@ -699,21 +708,23 @@ func (c *Controller) submitSparkApplication(app *v1beta2.SparkApplication) *v1be
 	}
 	c.recordSparkApplicationEvent(app)
 
-	service, err := createSparkUIService(app, c.kubeClient)
-	if err != nil {
-		glog.Errorf("failed to create UI service for SparkApplication %s/%s: %v", app.Namespace, app.Name, err)
-	} else {
-		app.Status.DriverInfo.WebUIServiceName = service.serviceName
-		app.Status.DriverInfo.WebUIPort = service.servicePort
-		app.Status.DriverInfo.WebUIAddress = fmt.Sprintf("%s:%d", service.serviceIP, app.Status.DriverInfo.WebUIPort)
-		// Create UI Ingress if ingress-format is set.
-		if c.ingressURLFormat != "" {
-			ingress, err := createSparkUIIngress(app, *service, c.ingressURLFormat, c.kubeClient)
-			if err != nil {
-				glog.Errorf("failed to create UI Ingress for SparkApplication %s/%s: %v", app.Namespace, app.Name, err)
-			} else {
-				app.Status.DriverInfo.WebUIIngressAddress = ingress.ingressURL
-				app.Status.DriverInfo.WebUIIngressName = ingress.ingressName
+	if c.enableUIService {
+		service, err := createSparkUIService(app, c.kubeClient)
+		if err != nil {
+			glog.Errorf("failed to create UI service for SparkApplication %s/%s: %v", app.Namespace, app.Name, err)
+		} else {
+			app.Status.DriverInfo.WebUIServiceName = service.serviceName
+			app.Status.DriverInfo.WebUIPort = service.servicePort
+			app.Status.DriverInfo.WebUIAddress = fmt.Sprintf("%s:%d", service.serviceIP, app.Status.DriverInfo.WebUIPort)
+			// Create UI Ingress if ingress-format is set.
+			if c.ingressURLFormat != "" {
+				ingress, err := createSparkUIIngress(app, *service, c.ingressURLFormat, c.kubeClient)
+				if err != nil {
+					glog.Errorf("failed to create UI Ingress for SparkApplication %s/%s: %v", app.Namespace, app.Name, err)
+				} else {
+					app.Status.DriverInfo.WebUIIngressAddress = ingress.ingressURL
+					app.Status.DriverInfo.WebUIIngressName = ingress.ingressName
+				}
 			}
 		}
 	}
@@ -966,18 +977,18 @@ func (c *Controller) recordDriverEvent(app *v1beta2.SparkApplication, phase v1be
 	}
 }
 
-func (c *Controller) recordExecutorEvent(app *v1beta2.SparkApplication, state v1beta2.ExecutorState, name string) {
+func (c *Controller) recordExecutorEvent(app *v1beta2.SparkApplication, state v1beta2.ExecutorState, args ...interface{}) {
 	switch state {
 	case v1beta2.ExecutorCompletedState:
-		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorCompleted", "Executor %s completed", name)
+		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorCompleted", "Executor %s completed", args)
 	case v1beta2.ExecutorPendingState:
-		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorPending", "Executor %s is pending", name)
+		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorPending", "Executor %s is pending", args)
 	case v1beta2.ExecutorRunningState:
-		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorRunning", "Executor %s is running", name)
+		c.recorder.Eventf(app, apiv1.EventTypeNormal, "SparkExecutorRunning", "Executor %s is running", args)
 	case v1beta2.ExecutorFailedState:
-		c.recorder.Eventf(app, apiv1.EventTypeWarning, "SparkExecutorFailed", "Executor %s failed", name)
+		c.recorder.Eventf(app, apiv1.EventTypeWarning, "SparkExecutorFailed", "Executor %s failed with ExitCode: %d, Reason: %s", args)
 	case v1beta2.ExecutorUnknownState:
-		c.recorder.Eventf(app, apiv1.EventTypeWarning, "SparkExecutorUnknownState", "Executor %s in unknown state", name)
+		c.recorder.Eventf(app, apiv1.EventTypeWarning, "SparkExecutorUnknownState", "Executor %s in unknown state", args)
 	}
 }
 

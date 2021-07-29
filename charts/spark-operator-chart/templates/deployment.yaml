@@ -32,6 +32,9 @@ spec:
     {{- end }}
       labels:
         {{- include "spark-operator.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+          {{- toYaml . | trim | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "spark-operator.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
@@ -55,6 +58,7 @@ spec:
         - -v={{ .Values.logLevel }}
         - -logtostderr
         - -namespace={{ .Values.sparkJobNamespace }}
+        - -enable-ui-service={{ .Values.uiService.enable}}
         - -ingress-url-format={{ .Values.ingressUrlFormat }}
         - -controller-threads={{ .Values.controllerThreads }}
         - -resync-interval={{ .Values.resyncInterval }}
@@ -90,7 +94,7 @@ spec:
       volumes:
         - name: webhook-certs
           secret:
-            secretName: spark-webhook-certs
+            secretName: {{ include "spark-operator.fullname" . }}-webhook-certs
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
